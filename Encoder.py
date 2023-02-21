@@ -1,7 +1,6 @@
 def encode(str_word): # from 16 bit to 8bit
     result = bytearray()
     for i in range(len(str_word)):
-        b = "b'\x00"
         c = ord(str_word[i])
         if (c >= 48 and c <= 57): # 0-9
             result.append(c + 4)
@@ -23,7 +22,7 @@ def encode(str_word): # from 16 bit to 8bit
         elif (c == 165):# "¥"
             result.append(68)
         
-    print(len(result))
+    #print(len(result))
     return result
 
 
@@ -49,8 +48,9 @@ def decode(data): #byte[]
             result += chr(b + 71)
         else:
             result += chr(b + 65)
-    print(result)
+
+    #print(result)
     return result
 
 
-decode(encode("abcxyz012789ABCXYZ'¥"))
+#decode(encode("abcxyz012789ABCXYZ'¥"))
