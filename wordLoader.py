@@ -22,20 +22,6 @@ install instructions -
 
 #We are going to try Krovetz stemmer, Porter stemmer ,snowballstemmer and lemmatization to compare performance
 
-def writeDictToFile(wordDictionary):
-
-    
-    with open("./results/wordDictionaryData.txt", "w") as file: 
-
-        for word in wordDictionary:
-
-            file.write(word + " " + str(wordDictionary[word]) + "\n")
-
-        print("Data successfully written")
-
-    return
-
-
 class Indexer():
     
     index = {}
@@ -48,15 +34,21 @@ class Indexer():
     
 
     def write_index_to_file(self):
-        json_object = json.dumps(self.index, indent = 8) 
+        json_object = json.dumps(self.index, indent = 4) 
 
-        with open("TotalIndex.json", "w") as outfile:
+        with open("./TotalIndex.json", "w") as outfile:
             outfile.write(json_object)
         
         return
 
 
-    def read_index_to_file(self):
+    def read_index_from_file(self):
+        #self.displayIndex()
+        self.index.clear()
+        with open("./TotalIndex.json", "r") as readfile:
+            self.index = json.load(readfile)
+
+        #self.displayIndex()
         return
 
     def compute_tf_idf_score(self):
@@ -72,6 +64,7 @@ class Indexer():
         return
 
     def displayIndex(self):
+        print()
         for word in self.index:
             print("The word is " + word + " and the list is ")
             print(self.index[word])
@@ -106,6 +99,7 @@ class Indexer():
         return stem_words
 
     def localParser(self):
+        periodic_write_counter = 0
         for root, dirs, files in os.walk(self.path, topdown=False):
             for name in files:
                 #print(os.path.join(root, name))
@@ -118,26 +112,36 @@ class Indexer():
                 soup = BeautifulSoup(html, "html.parser")
             
                 for data in soup(['style', 'script','a']):
-                    # Remove tags
                     data.decompose()
             
-                # return data by retrieving the tag content
+                #data by retrieving the tag content
                 alltxtcontent = ' '.join(soup.stripped_strings)
 
                 #print(alltxtcontent)
                 words = word_tokenize(alltxtcontent.lower())
                 stem_words = self.Stemming(words)
-                #print(words)
-                #stem's of each word
-                
+
+                #Use to check the stemmer output
                 #for e1,e2 in zip(words,stem_words):
                 #        print(e1+' ----> '+e2)
 
-                self.displayIndex()
-                sys.exit(0)
+                #Use to check the outfile
+                #self.displayIndex()
+                #self.write_index_to_file()
+                #self.read_index_from_file()
+                #sys.exit(0)
+
+                #Periodic writing to the file
+                periodic_write_counter += 1
+                if(periodic_write_counter>100):
+                    print("successfully written to file")
+                    self.write_index_to_file()
+                    periodic_write_counter = 0
 
         return
 
 if __name__ == "__main__":
     idx = Indexer()
     idx.localParser()
+    idx.displayIndex()
+    idx.write_index_to_file()
