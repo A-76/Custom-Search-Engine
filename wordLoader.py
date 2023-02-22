@@ -173,12 +173,12 @@ class Indexer():
                 #Periodic writing to the file
                 periodic_write_counter += 1
 
-                if(periodic_write_counter>10):
+                if(periodic_write_counter>1000):
                     print("successfully written to file")
-                    self.compute_tf_idf_score()
+                    #self.compute_tf_idf_score() uncomment for debugging 
                     self.write_index_to_file()
                     periodic_write_counter = 0
-                    return 
+                    #return uncomment for debugging 
 
         return
 
@@ -186,4 +186,5 @@ if __name__ == "__main__":
     idx = Indexer()
     idx.localParser()
     idx.displayIndex()
+    idx.compute_tf_idf_score()
     idx.write_index_to_file()
