@@ -22,10 +22,13 @@ install instructions -
 
 #We are going to try Krovetz stemmer, Porter stemmer ,snowballstemmer and lemmatization to compare performance
 
+#for a given list in the indexx, the last element is going to be the tf -idf score of the element
+
 class Indexer():
     
     index = {}
     currFile = ''
+    docID = -1
 
     def __init__(self,path="./developer/DEV/",stemmer="krovetz"):
         self.path = path
@@ -52,15 +55,24 @@ class Indexer():
         return
 
     def compute_tf_idf_score(self):
+        #Executed at the end once the entire corpus is indexed
+        
         return -1
 
-    def addToIndex(self,word):
+    def addToIndex(self,word,position):
         #Each token/word needs to have a list of documents that it is present in along with the tf-idf score.
         if(word not in self.index.keys()):
             self.index[word] = []
+            new_entry = [self.docID,position]
+            self.index[word].append(new_entry)
 
-        new_entry = [self.currFile,self.compute_tf_idf_score()]
-        self.index[word].append(new_entry)
+        else:
+            #print(self.index[word])
+            if(self.index[word][-1][0]  == self.docID):  #This line is going to check the docID of the previous insertion, if same as currID then add to same list
+                       self.index[word][-1].append(position)
+            else:                    
+                new_entry = [self.docID,position]
+                self.index[word].append(new_entry)
         return
 
     def displayIndex(self):
@@ -75,36 +87,46 @@ class Indexer():
         stem_words = []
         if(self.stemmer == "porter"):
             porter_stemmer = PorterStemmer()
+            word_pos = 0
             for w in words:
                 stemmedWord = porter_stemmer.stem(w)
                 stem_words.append(stemmedWord)
-                self.addToIndex(stemmedWord)
+                self.addToIndex(stemmedWord,word_pos)
+                word_pos += 1
 
 
         elif(self.stemmer == "snowball"):
             snow_stemmer = SnowballStemmer(language='english')
+            word_pos = 0
             for w in words:
                 stemmedWord = snow_stemmer.stem(w)
                 stem_words.append(stemmedWord)
-                self.addToIndex(stemmedWord)
+                self.addToIndex(stemmedWord,word_pos)
+                word_pos += 1
 
         else:
             #print("Using Default Stemmer")
             krovetz_stemmer = Stemmer()
+            word_pos = 0
             for w in words:
                 stemmedWord = krovetz_stemmer.stem(w)
                 stem_words.append(stemmedWord)
-                self.addToIndex(stemmedWord)
+                self.addToIndex(stemmedWord,word_pos)
+                word_pos += 1
 
         return stem_words
 
     def localParser(self):
         periodic_write_counter = 0
+        document_count = 0
         for root, dirs, files in os.walk(self.path, topdown=False):
             for name in files:
                 #print(os.path.join(root, name))
                 # Opening JSON file
                 self.currFile = name
+                self.docID = document_count
+                document_count += 1
+
                 f = open(os.path.join(root, name))
 
                 b_raw = json.load(f)
@@ -133,10 +155,11 @@ class Indexer():
 
                 #Periodic writing to the file
                 periodic_write_counter += 1
-                if(periodic_write_counter>100):
+                if(periodic_write_counter>10):
                     print("successfully written to file")
                     self.write_index_to_file()
                     periodic_write_counter = 0
+                    return 
 
         return
 
