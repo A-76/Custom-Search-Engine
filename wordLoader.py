@@ -10,6 +10,7 @@ import nltk
 from nltk.stem.snowball import SnowballStemmer,PorterStemmer
 from krovetzstemmer import Stemmer
 
+import numpy as np
 '''
 install instructions - 
 1) pip3 install nltk
@@ -29,6 +30,9 @@ class Indexer():
     index = {}
     currFile = ''
     docID = -1
+
+    #doc_info = {docID,numWords in doc}
+    document_info = {}
 
     def __init__(self,path="./developer/DEV/",stemmer="krovetz"):
         self.path = path
@@ -56,8 +60,20 @@ class Indexer():
 
     def compute_tf_idf_score(self):
         #Executed at the end once the entire corpus is indexed
-        
-        return -1
+        for word in self.index:
+            num_document_occurrences = len(self.index[word])   #Number of documents in which the word occurred
+
+            idf = np.log((self.docID+1)/num_document_occurrences)
+
+            #now computing tf for every document in which the word occurred
+            for document in self.index[word]:
+                num_occurrences_in_doc =  len(document) - 1 # -1 because the first element in the list is the docID
+                num_words_in_doc = self.document_info[document[0]]
+                tf = float(num_occurrences_in_doc)/num_words_in_doc
+                tf_idf = tf*idf
+                document.append(tf_idf)
+
+        return 
 
     def addToIndex(self,word,position):
         #Each token/word needs to have a list of documents that it is present in along with the tf-idf score.
@@ -114,6 +130,7 @@ class Indexer():
                 self.addToIndex(stemmedWord,word_pos)
                 word_pos += 1
 
+        self.document_info[self.docID] = len(words)
         return stem_words
 
     def localParser(self):
@@ -155,8 +172,10 @@ class Indexer():
 
                 #Periodic writing to the file
                 periodic_write_counter += 1
+
                 if(periodic_write_counter>10):
                     print("successfully written to file")
+                    self.compute_tf_idf_score()
                     self.write_index_to_file()
                     periodic_write_counter = 0
                     return 
