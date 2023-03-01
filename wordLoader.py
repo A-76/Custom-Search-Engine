@@ -4,6 +4,11 @@ from bs4 import BeautifulSoup
 import sys
 import nltk
 from nltk.tokenize import word_tokenize
+from nltk.corpus import words
+
+
+
+#nltk.download('words')
 #nltk.download('punkt')
 
 from pathlib import Path
@@ -40,6 +45,7 @@ class Indexer():
     def __init__(self,path="./developer/DEV/",stemmer="krovetz"):
         self.path = path
         self.stemmer = stemmer
+        self.total_word_lst = set(w.lower() for w in nltk.corpus.words.words())
         return
     
 
@@ -184,43 +190,49 @@ class Indexer():
 
     def Stemming(self,words):
         stem_words = []
+        punct_lst = [",",".","?","!"]
         if(self.stemmer == "porter"):
             porter_stemmer = PorterStemmer()
             word_pos = 0
             for w in words:
-                if(w=="," or w == "." or w == "?"):
-                    continue
-                stemmedWord = porter_stemmer.stem(w)
-                stem_words.append(stemmedWord)
-                self.addToIndex(stemmedWord,word_pos)
-                word_pos += 1
+                #if(not w.isalnum()):  #need to change this
+                #    continue
+
+                if(w in self.total_word_lst):
+                    stemmedWord = krovetz_stemmer.stem(w)
+                    stem_words.append(stemmedWord)
+                    #self.addToIndex(stemmedWord,word_pos)
+                    self.addToIndex(stemmedWord,word_pos)
+                    word_pos += 1
 
 
         elif(self.stemmer == "snowball"):
             snow_stemmer = SnowballStemmer(language='english')
             word_pos = 0
             for w in words:
-                if(w=="," or w == "." or w == "?"):
-                    continue
+                #if(w in punct_lst):
+                #    continue
 
-                stemmedWord = snow_stemmer.stem(w)
-                stem_words.append(stemmedWord)
-                self.addToIndex(stemmedWord,word_pos)
-                word_pos += 1
+                if(w in self.total_word_lst):
+                    stemmedWord = snow_stemmer.stem(w)
+                    stem_words.append(stemmedWord)
+                    self.addToIndex(stemmedWord,word_pos)
+                    word_pos += 1
 
         else:
             #print("Using Default Stemmer")
             krovetz_stemmer = Stemmer()
             word_pos = 0
             for w in words:
-                if(not w.isalnum()):  #need to change this
-                    continue
+                #if(not w.isalnum()):  #need to change this
+                #    continue
 
-                stemmedWord = krovetz_stemmer.stem(w)
-                stem_words.append(stemmedWord)
-                #self.addToIndex(stemmedWord,word_pos)
-                self.addToIndex(stemmedWord,word_pos)
-                word_pos += 1
+                if(w in self.total_word_lst):
+                    stemmedWord = krovetz_stemmer.stem(w)
+                    stem_words.append(stemmedWord)
+                    #self.addToIndex(stemmedWord,word_pos)
+                    self.addToIndex(stemmedWord,word_pos)
+                    word_pos += 1
 
         self.document_info[self.docID] = len(stem_words)
         return stem_words
@@ -276,10 +288,10 @@ class Indexer():
                 #data by retrieving the tag content
                 alltxtcontent = ' '.join(soup.stripped_strings)
 
-                #print(alltxtcontent)
                 words = word_tokenize(alltxtcontent.lower())
                 stem_words = self.Stemming(words)
-
+                print(stem_words)
+                return
                 #Use to check the stemmer output
                 #for e1,e2 in zip(words,stem_words):
                 #        print(e1+' ----> '+e2)
@@ -316,6 +328,6 @@ if __name__ == "__main__":
     #    print()
     #idx.delta_encode()
     #idx.delta_decode()
-    idx.compute_tf_idf_score()
+    #idx.compute_tf_idf_score()
     #idx.displayIndex()
-    idx.write_index_to_file()
+    #idx.write_index_to_file()
