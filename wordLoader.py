@@ -279,6 +279,7 @@ class Indexer():
                 f = open(os.path.join(root, name))
 
                 b_raw = json.load(f)
+                print(type(b_raw))
                 html = b_raw["content"]
                 soup = BeautifulSoup(html, "html.parser")
             
