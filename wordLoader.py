@@ -5,8 +5,8 @@ import sys
 import nltk
 from nltk.tokenize import word_tokenize
 from nltk.corpus import words
-
-
+import shutil
+import random
 
 #nltk.download('words')
 #nltk.download('punkt')
@@ -18,6 +18,8 @@ from krovetzstemmer import Stemmer
 import msgspec
 
 import numpy as np
+from collections import defaultdict
+
 '''
 install instructions - 
 1) pip3 install nltk
@@ -47,14 +49,80 @@ class Indexer():
         self.total_word_lst = set(w.lower() for w in nltk.corpus.words.words())
         self.encoder = msgspec.json.Encoder()
         self.decoder = msgspec.json.Decoder()
+
+        #Hyperparameter Values
+        self.num_files_per_letter = 10
         self.write_binary = True
+
+        self.updatedIndex = {}
+        self.word_to_file = {}
+
         return
     
-    def write_num_words_to_file(self):
-        with open("./num_words.txt", "w") as outfile:
-            outfile.write(str(len(self.index.keys())))
-        return
+    def updatedAddToIndex(self,word,position):
+        #Each token/word needs to have a list of documents that it is present in along with the tf-idf score.
+        first_char = word[0]
+        if(first_char not in self.updatedIndex.keys()):
+            first_char = "extra"
 
+        correct_dictionary = self.updatedIndex[first_char]
+        if(word not in correct_dictionary.keys()):
+            self.updatedIndex[first_char][word] = []
+            new_entry = [self.docID,[position]]
+            self.updatedIndex[first_char][word].append(new_entry)
+
+        else:
+            #print(self.index[word])
+            if(correct_dictionary[word][-1][0]  == self.docID):  #This line is going to check the docID of the previous insertion, if same as currID then add to same list
+                    #print("The length of the list is ")
+                    #print(self.index[word][-1])
+                    val_to_add = position - self.updatedIndex[first_char][word][-1][1][-1]
+                    self.updatedIndex[first_char][word][-1][1].append(val_to_add)
+
+            else:                    
+                new_entry = [self.docID,[position]]
+                self.updatedIndex[first_char][word].append(new_entry)
+
+        return
+    
+    def generate_all_directories(self):
+        path = "./IndexStructure/"
+
+        if(os.path.exists(path)):
+            self.destroy_all_directories()
+
+        os.mkdir(path)
+        for i in range(97,123):
+            os.mkdir(path + chr(i))
+            self.updatedIndex[chr(i)] = {}
+            self.word_to_file[chr(i)] = {}
+
+        self.updatedIndex["extra"] = {}
+        self.word_to_file["extra"] = {}
+        
+        os.mkdir(path + "extraCharacters")
+        return
+    
+    def destroy_all_directories(self):
+        path = "./IndexStructure/"
+        shutil.rmtree(path)
+        if(os.path.exists("./num_words.txt")):
+            os.remove("./num_words.txt")
+        
+        if(os.path.exists("./document_to_id.json")):
+            os.remove("./document_to_id.json")
+
+        if(os.path.exists("./TotalIndex.json")):
+            os.remove("./TotalIndex.json")
+        return
+    
+    def updated_write_num_words_to_file(self):
+        with open("./num_words.txt", "w") as outfile:
+            total_words  = 0
+            for key in self.word_to_file.keys():
+                total_words += len(self.word_to_file[key].keys())
+            outfile.write(str(total_words))
+        return
         
     def write_document_id_to_file(self):
         if(not self.write_binary):
@@ -71,7 +139,6 @@ class Indexer():
         self.document_to_id.clear()
         return
 
-
     def write_index_to_file(self):
         if(not self.write_binary):
             json_object = json.dumps(self.index, indent = 4) 
@@ -84,20 +151,57 @@ class Indexer():
                 outfile.write(a)
         return
 
+    def create_file_to_word(self,file_number_dict):
+        #sorted_dict  = dict(sorted(file_number_dict.items(), key=lambda x:x[1]))
+        res =defaultdict(list)
+        for key, val in sorted(file_number_dict.items()):
+            res[val].append(key)
+        #print(res)
+        return res
+    
+    def create_json(self,file_to_word,file_number,char):
+        corresponding_json = {}
+        for word in file_to_word[file_number]:
+            corresponding_json[word] = self.updatedIndex[char][word]
+        
+        return corresponding_json
 
-    def read_index_from_file(self):
-        #self.displayIndex()
-        self.index.clear()
-        if(not self.write_binary):
-            with open("./TotalIndex.json", "r") as readfile:
-                self.index = json.load(readfile)
-        else:
-            with open("./TotalIndex.json", "r") as outfile:
-                x = outfile.read()
-            self.index = self.decoder.decode(x)
-        self.displayIndex()
+    def updated_write_index_to_file(self):
+        basepath = "./IndexStructure/"
+        for char in self.updatedIndex:
+            res = self.create_file_to_word(self.word_to_file[char])
+            for file_number in res.keys():
+                newpath = basepath + char + "/" + str(file_number) + ".json"
+                corresponding_json = self.create_json(res,file_number,char)
+
+                if(not self.write_binary):
+                    json_object = json.dumps(corresponding_json, indent = 4) 
+                    with open(newpath, "w") as outfile:
+                        outfile.write(json_object)
+                else:
+                    a = self.encoder.encode(corresponding_json)
+                    with open(newpath, "wb") as outfile:
+                        outfile.write(a)
         return
+    
+    def updated_read_index_from_file(self):
+        basepath = "./IndexStructure/"
+        for char in self.updatedIndex:
+            for file_number in range(1,self.num_files_per_letter+1):
+                newpath = basepath + char + "/" + str(file_number) + ".json"
+                if(not os.path.exists(newpath)):
+                    continue
 
+                if(not self.write_binary):
+                    with open(newpath, "r") as readfile:
+                        self.index = json.load(readfile)
+                else:
+                    with open(newpath, "r") as outfile:
+                        x = outfile.read()
+                    self.updatedIndex[char].update(self.decoder.decode(x))
+        self.displayupdatedIndex()
+        return
+    
     def compute_tf_idf_score(self):
         print("cocmputed the tf idf score")
         #Executed at the end once the entire corpus is indexed
@@ -116,37 +220,23 @@ class Indexer():
 
         return 
 
-
-
-    def addToIndex(self,word,position):
-        #Each token/word needs to have a list of documents that it is present in along with the tf-idf score.
-        if(word not in self.index.keys()):
-            self.index[word] = []
-            new_entry = [self.docID,position]
-            self.index[word].append(new_entry)
-
-        else:
-            #print(self.index[word])
-            if(self.index[word][-1][0]  == self.docID):  #This line is going to check the docID of the previous insertion, if same as currID then add to same list
-                    #print("The length of the list is ")
-                    #print(self.index[word][-1])
-                    if(len(self.index[word][-1])==2):
-                        self.index[word][-1].append(position)
-
-                    else:
-                        val_to_add = position - self.index[word][-1][-1]
-                        self.index[word][-1].append(val_to_add)
-            else:                    
-                new_entry = [self.docID,position]
-                self.index[word].append(new_entry)
+     
+    def displayupdatedIndex(self):
+        print()
+        for char in self.updatedIndex:
+            print(f"The character is {char}")
+            for word in self.updatedIndex[char]:
+                print("The word is " + word + " and the list is ")
+                print(self.updatedIndex[char][word])
+                print()
         return
 
-    def displayIndex(self):
-        print()
-        for word in self.index:
-            print("The word is " + word + " and the list is ")
-            print(self.index[word])
-            print()
+    def update_word_to_file(self,word):
+        first_char = word[0]
+        if(first_char not in self.word_to_file.keys()):
+            first_char = "extra"
+        if(word not in self.word_to_file[first_char].keys()):
+            self.word_to_file[first_char][word] = random.randint(1, self.num_files_per_letter)
         return
 
     def Stemming(self,words):
@@ -163,7 +253,9 @@ class Indexer():
                     stemmedWord = krovetz_stemmer.stem(w)
                     stem_words.append(stemmedWord)
                     #self.addToIndex(stemmedWord,word_pos)
-                    self.addToIndex(stemmedWord,word_pos)
+                    #self.addToIndex(stemmedWord,word_pos)
+                    self.updatedAddToIndex(stemmedWord,word_pos)
+                    self.update_word_to_file(stemmedWord)
                     word_pos += 1
 
 
@@ -177,7 +269,9 @@ class Indexer():
                 if(w in self.total_word_lst):
                     stemmedWord = snow_stemmer.stem(w)
                     stem_words.append(stemmedWord)
-                    self.addToIndex(stemmedWord,word_pos)
+                    #self.addToIndex(stemmedWord,word_pos)
+                    self.updatedAddToIndex(stemmedWord,word_pos)
+                    self.update_word_to_file(stemmedWord)
                     word_pos += 1
 
         else:
@@ -192,13 +286,13 @@ class Indexer():
                     stemmedWord = krovetz_stemmer.stem(w)
                     stem_words.append(stemmedWord)
                     #self.addToIndex(stemmedWord,word_pos)
-                    self.addToIndex(stemmedWord,word_pos)
+                    #self.addToIndex(stemmedWord,word_pos)
+                    self.updatedAddToIndex(stemmedWord,word_pos)
+                    self.update_word_to_file(stemmedWord)
                     word_pos += 1
 
         self.document_info[self.docID] = len(stem_words)
         return stem_words
-
-
 
 
     def delta_decode(self):
@@ -240,7 +334,6 @@ class Indexer():
                 f = open(os.path.join(root, name))
 
                 b_raw = json.load(f)
-                print(type(b_raw))
                 html = b_raw["content"]
                 soup = BeautifulSoup(html, "html.parser")
             
@@ -267,14 +360,20 @@ class Indexer():
                 #Periodic writing to the file
                 periodic_write_counter += 1
 
-                if(periodic_write_counter>0):
+                if(periodic_write_counter>10):
                     num_file_writes += 1
                     print(str(num_file_writes) + ") successfully written to file")
                     self.compute_tf_idf_score() #uncomment for debugging 
-                    #self.displayIndex()
-                    self.write_index_to_file()
+                    self.displayupdatedIndex()
+
+                    #self.write_num_words_to_file()
+                    self.updated_write_num_words_to_file()
+                    self.updated_write_index_to_file()
+                    print("This is the recovered index")
+                    self.updated_read_index_from_file()
+                    sys.exit()
                     self.write_document_id_to_file()
-                    self.write_num_words_to_file()
+                    
                     print()
                     print()
                     print()
@@ -287,9 +386,11 @@ class Indexer():
 
 if __name__ == "__main__":
 
+
     idx = Indexer()
+    idx.generate_all_directories()
     idx.localParser()
-    idx.write_num_words_to_file()
+    #idx.write_num_words_to_file()
 
     #for i in range(5):
     #    print()
