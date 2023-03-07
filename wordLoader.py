@@ -65,7 +65,9 @@ class Indexer():
         if(first_char not in self.updatedIndex.keys()):
             first_char = "extra"
 
+
         correct_dictionary = self.updatedIndex[first_char]
+
         if(word not in correct_dictionary.keys()):
             self.updatedIndex[first_char][word] = []
             new_entry = [self.docID,[position]]
@@ -139,18 +141,6 @@ class Indexer():
         self.document_to_id.clear()
         return
 
-    def write_index_to_file(self):
-        if(not self.write_binary):
-            json_object = json.dumps(self.index, indent = 4) 
-
-            with open("./TotalIndex.json", "w") as outfile:
-                outfile.write(json_object)
-        else:
-            a = self.encoder.encode(self.index)
-            with open("./TotalIndex.json", "ab") as outfile:
-                outfile.write(a)
-        return
-
     def create_file_to_word(self,file_number_dict):
         #sorted_dict  = dict(sorted(file_number_dict.items(), key=lambda x:x[1]))
         res =defaultdict(list)
@@ -166,7 +156,53 @@ class Indexer():
         
         return corresponding_json
 
+    def updated_read_index_from_file(self):
+        basepath = "./IndexStructure/"
+        disk_index = {}
+        for char in self.updatedIndex:
+            for file_number in range(1,self.num_files_per_letter+1):
+                newpath = basepath + char + "/" + str(file_number) + ".json"
+
+                if(not os.path.exists(newpath)):
+                    continue
+
+                if(not self.write_binary):
+                    with open(newpath, "r") as readfile:
+                        self.index = json.load(readfile)
+                else:
+                    with open(newpath, "r") as outfile:
+                        x = outfile.read()
+                    if(char not in disk_index.keys() or (len(disk_index[char].keys())==0)):
+                        disk_index[char] = self.decoder.decode(x)
+
+                    else:
+                        disk_index[char].update(self.decoder.decode(x))
+        #self.displayupdatedIndex()
+        return disk_index
+
+    def merge(self):
+        #call read index from file here
+        disk_index = self.updated_read_index_from_file()
+        print(disk_index)
+        curr_index = self.updatedIndex
+
+        for char in curr_index:
+            if(char not in disk_index.keys()):
+                disk_index[char] = {}
+
+            for word in curr_index[char]:
+                if(word not in disk_index[char].keys()):
+                    #first word occurrence after the write to file.
+                    disk_index[char][word] = curr_index[char][word].copy()   
+
+                else:
+                    disk_index[char][word] += curr_index[char][word]
+        
+        self.updatedIndex = disk_index
+        return
+    
     def updated_write_index_to_file(self):
+        self.merge()
         basepath = "./IndexStructure/"
         for char in self.updatedIndex:
             res = self.create_file_to_word(self.word_to_file[char])
@@ -182,26 +218,11 @@ class Indexer():
                     a = self.encoder.encode(corresponding_json)
                     with open(newpath, "wb") as outfile:
                         outfile.write(a)
-        return
-    
-    def updated_read_index_from_file(self):
-        basepath = "./IndexStructure/"
+        
         for char in self.updatedIndex:
-            for file_number in range(1,self.num_files_per_letter+1):
-                newpath = basepath + char + "/" + str(file_number) + ".json"
-                if(not os.path.exists(newpath)):
-                    continue
-
-                if(not self.write_binary):
-                    with open(newpath, "r") as readfile:
-                        self.index = json.load(readfile)
-                else:
-                    with open(newpath, "r") as outfile:
-                        x = outfile.read()
-                    self.updatedIndex[char].update(self.decoder.decode(x))
-        self.displayupdatedIndex()
+            self.updatedIndex[char].clear()
         return
-    
+
     def compute_tf_idf_score(self):
         print("cocmputed the tf idf score")
         #Executed at the end once the entire corpus is indexed
@@ -360,26 +381,29 @@ class Indexer():
                 #Periodic writing to the file
                 periodic_write_counter += 1
 
-                if(periodic_write_counter>10):
+                if(periodic_write_counter>0):
                     num_file_writes += 1
                     print(str(num_file_writes) + ") successfully written to file")
-                    self.compute_tf_idf_score() #uncomment for debugging 
+                    #self.compute_tf_idf_score() #uncomment for debugging 
                     self.displayupdatedIndex()
 
                     #self.write_num_words_to_file()
                     self.updated_write_num_words_to_file()
-                    self.updated_write_index_to_file()
-                    print("This is the recovered index")
-                    self.updated_read_index_from_file()
-                    sys.exit()
                     self.write_document_id_to_file()
+
+                    self.updated_write_index_to_file()
+                    #print("This is the recovered index")
+                    #self.updated_read_index_from_file()
+                    if(periodic_write_counter==7):
+                        sys.exit()
+
+                    
                     
                     print()
                     print()
                     print()
-                    self.read_index_from_file()
-                    periodic_write_counter = 0
-                    sys.exit()
+                    #periodic_write_counter = 0
+
                     #return #uncomment for debugging 
 
         return
@@ -390,7 +414,7 @@ if __name__ == "__main__":
     idx = Indexer()
     idx.generate_all_directories()
     idx.localParser()
-    #idx.write_num_words_to_file()
+    idx.write_num_words_to_file()
 
     #for i in range(5):
     #    print()

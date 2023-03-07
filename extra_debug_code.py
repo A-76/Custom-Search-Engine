@@ -102,3 +102,16 @@
         with open("./num_words.txt", "w") as outfile:
             outfile.write(str(len(self.index.keys())))
         return
+
+
+    def write_index_to_file(self):
+        if(not self.write_binary):
+            json_object = json.dumps(self.index, indent = 4) 
+
+            with open("./TotalIndex.json", "w") as outfile:
+                outfile.write(json_object)
+        else:
+            a = self.encoder.encode(self.index)
+            with open("./TotalIndex.json", "ab") as outfile:
+                outfile.write(a)
+        return
