@@ -1,3 +1,5 @@
 *.zip
 *.json
 developer/
+IndexStructure/
+num_words.txt
