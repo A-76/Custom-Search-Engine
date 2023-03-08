@@ -13,7 +13,7 @@ import random
 
 from pathlib import Path
 import nltk
-from nltk.stem.snowball import SnowballStemmer,PorterStemmer
+from nltk.stem.snowball import SnowballStemmer, PorterStemmer
 from krovetzstemmer import Stemmer
 import msgspec
 
@@ -27,20 +27,21 @@ install instructions -
 3) pip3 install krovetzstemmer
 '''
 
+# We are going to try Krovetz stemmer, Porter stemmer ,snowballstemmer and lemmatization to compare performance
 
 #We are going to try Krovetz stemmer, Porter stemmer ,snowballstemmer and lemmatization to compare performance
 
 #for a given list in the indexx, the last element is going to be the tf -idf score of the element
 
 class Indexer():
-    
+    save_path = "E:\\CS221JAVA\\saved"
     index = {}
     document_to_id = {}
 
     currFile = ''
     docID = -1
 
-    #doc_info = {docID,numWords in doc}
+    # doc_info = {docID,numWords in doc}
     document_info = {}
 
     num_times_written_to_file = 0
@@ -283,7 +284,7 @@ class Indexer():
             self.word_to_file[first_char][word] = random.randint(1, self.num_files_per_letter)
         return
 
-    def Stemming(self,words):
+    def Stemming(self, words):
         stem_words = []
         punct_lst = [",",".","?","!"]
         if(self.stemmer == "porter"):
@@ -302,7 +303,6 @@ class Indexer():
                     self.update_word_to_file(stemmedWord)
                     word_pos += 1
 
-
         elif(self.stemmer == "snowball"):
             snow_stemmer = SnowballStemmer(language='english')
             word_pos = 0
@@ -319,7 +319,7 @@ class Indexer():
                     word_pos += 1
 
         else:
-            #print("Using Default Stemmer")
+            # print("Using Default Stemmer")
             krovetz_stemmer = Stemmer()
             word_pos = 0
             for w in words:
@@ -338,13 +338,12 @@ class Indexer():
         self.document_info[self.docID] = len(stem_words)
         return stem_words
 
-
     def delta_decode(self):
         self.decodedIndex = self.index
         for word in self.index:
             for i in range(len(self.index[word])):
-                for j in range(2,len(self.index[word][i])):
-                    self.decodedIndex[word][i][j] +=  self.index[word][i][j-1] 
+                for j in range(2, len(self.index[word][i])):
+                    self.decodedIndex[word][i][j] += self.index[word][i][j - 1] 
         '''
         print()
         for word in self.decodedIndex:
@@ -384,12 +383,12 @@ class Indexer():
 
         for root, dirs, files in os.walk(self.path, topdown=False):
             for name in files:
-                #print(os.path.join(root, name))
+                # print(os.path.join(root, name))
                 # Opening JSON file
 
                 self.currFile = name
                 self.docID = document_count
-                self.document_to_id[name] =  self.docID
+                self.document_to_id[name] = self.docID
                 document_count += 1
 
                 f = open(os.path.join(root, name))
@@ -398,10 +397,10 @@ class Indexer():
                 html = b_raw["content"]
                 soup = BeautifulSoup(html, "html.parser")
             
-                for data in soup(['style', 'script','a']):
+                for data in soup(['style', 'script', 'a']):
                     data.decompose()
             
-                #data by retrieving the tag content
+                # data by retrieving the tag content
                 alltxtcontent = ' '.join(soup.stripped_strings)
 
                 words = word_tokenize(alltxtcontent.lower())
@@ -412,16 +411,16 @@ class Indexer():
                 #for e1,e2 in zip(words,stem_words):
                 #        print(e1+' ----> '+e2)
 
-                #Use to check the outfile
-                #self.displayIndex()
-                #self.write_index_to_file()
-                #self.read_index_from_file()
-                #sys.exit(0)
+                # Use to check the outfile
+                # self.displayIndex()
+                # self.write_index_to_file()
+                # self.read_index_from_file()
+                # sys.exit(0)
 
-                #Periodic writing to the file
+                # Periodic writing to the file
                 periodic_write_counter += 1
 
-                if(periodic_write_counter>1000):
+                if(periodic_write_counter > 10):  # why 1000
                     num_file_writes += 1
                     print(str(num_file_writes) + ") successfully written to file")
 
@@ -442,6 +441,7 @@ class Indexer():
                     #return #uncomment for debugging 
 
         return
+
 
 if __name__ == "__main__":
 
