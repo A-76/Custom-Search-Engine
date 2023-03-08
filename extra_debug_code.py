@@ -115,3 +115,21 @@
             with open("./TotalIndex.json", "ab") as outfile:
                 outfile.write(a)
         return
+
+def compute_tf_idf_score(self):
+        print("cocmputed the tf idf score")
+        #Executed at the end once the entire corpus is indexed
+        for word in self.index:
+            num_document_occurrences = len(self.index[word])   #Number of documents in which the word occurred
+
+            idf = np.log((self.docID+1)/num_document_occurrences)
+
+            #now computing tf for every document in which the word occurred
+            for document in self.index[word]:
+                num_occurrences_in_doc =  len(document) - 1 # -1 because the first element in the list is the docID
+                num_words_in_doc = self.document_info[document[0]]
+                tf = float(num_occurrences_in_doc)/num_words_in_doc
+                tf_idf = float(tf*idf)
+                document.append(tf_idf)
+
+        return 

@@ -43,6 +43,7 @@ class Indexer():
     #doc_info = {docID,numWords in doc}
     document_info = {}
 
+    num_times_written_to_file = 0
     def __init__(self,path="./developer/DEV/",stemmer="krovetz"):
         self.path = path
         self.stemmer = stemmer
@@ -102,7 +103,7 @@ class Indexer():
         self.updatedIndex["extra"] = {}
         self.word_to_file["extra"] = {}
         
-        os.mkdir(path + "extraCharacters")
+        os.mkdir(path + "extra")
         return
     
     def destroy_all_directories(self):
@@ -180,10 +181,14 @@ class Indexer():
         #self.displayupdatedIndex()
         return disk_index
 
-    def merge(self):
-        #call read index from file here
-        disk_index = self.updated_read_index_from_file()
-        print(disk_index)
+    def merge(self,index=None):
+        if(index==None):
+            #call read index from file here
+            disk_index = self.updated_read_index_from_file()
+        else:
+            disk_index = index
+        #print(disk_index)
+
         curr_index = self.updatedIndex
 
         for char in curr_index:
@@ -201,8 +206,12 @@ class Indexer():
         self.updatedIndex = disk_index
         return
     
-    def updated_write_index_to_file(self):
-        self.merge()
+    def updated_write_index_to_file(self,index=None):
+        if(index== None):
+            self.merge()
+        else:
+            self.merge(index)
+
         basepath = "./IndexStructure/"
         for char in self.updatedIndex:
             res = self.create_file_to_word(self.word_to_file[char])
@@ -223,33 +232,47 @@ class Indexer():
             self.updatedIndex[char].clear()
         return
 
-    def compute_tf_idf_score(self):
-        print("cocmputed the tf idf score")
+    def updated_compute_tf_idf_score(self):
+        print("computed the tf idf score")
         #Executed at the end once the entire corpus is indexed
-        for word in self.index:
-            num_document_occurrences = len(self.index[word])   #Number of documents in which the word occurred
+        disk_index = self.updated_read_index_from_file()
 
-            idf = np.log((self.docID+1)/num_document_occurrences)
+        for char in disk_index:
+            for word in disk_index[char]:
+                num_document_occurrences = len(disk_index[char][word])   #Number of documents in which the word occurred
 
-            #now computing tf for every document in which the word occurred
-            for document in self.index[word]:
-                num_occurrences_in_doc =  len(document) - 1 # -1 because the first element in the list is the docID
-                num_words_in_doc = self.document_info[document[0]]
-                tf = float(num_occurrences_in_doc)/num_words_in_doc
-                tf_idf = float(tf*idf)
-                document.append(tf_idf)
+                idf = np.log((self.docID+1)/num_document_occurrences)
 
-        return 
+                #now computing tf for every document in which the word occurred
+                for document in disk_index[char][word]:
+                    num_occurrences_in_doc =  len(document[1]) 
+                    num_words_in_doc = self.document_info[document[0]]
+                    tf = float(num_occurrences_in_doc)/num_words_in_doc
+                    tf_idf = float(tf*idf)
+                    if(len(document) == 2):
+                        document.append(tf_idf)
+                    else:
+                        document[2] = tf_idf
 
+        #self.displayupdatedIndex(disk_index)s
+        return disk_index
      
-    def displayupdatedIndex(self):
+    def displayupdatedIndex(self,index=None):
         print()
-        for char in self.updatedIndex:
-            print(f"The character is {char}")
-            for word in self.updatedIndex[char]:
-                print("The word is " + word + " and the list is ")
-                print(self.updatedIndex[char][word])
-                print()
+        if(index==None):
+            for char in self.updatedIndex:
+                print(f"The character is {char}")
+                for word in self.updatedIndex[char]:
+                    print("The word is " + word + " and the list is ")
+                    print(self.updatedIndex[char][word])
+                    print()
+        else:
+            for char in index:
+                print(f"The character is {char}")
+                for word in index[char]:
+                    print("The word is " + word + " and the list is ")
+                    print(index[char][word])
+                    print()
         return
 
     def update_word_to_file(self,word):
@@ -332,6 +355,23 @@ class Indexer():
         return
         
 
+    def write_wf_relation_to_file(self):
+        basepath = "./IndexStructure/"
+        for char in self.word_to_file:
+            newpath = basepath + char + "/word_to_file.json"
+
+            corresponding_json = self.word_to_file[char]
+            if(not self.write_binary):
+                json_object = json.dumps(corresponding_json, indent = 4) 
+                with open(newpath, "w") as outfile:
+                    outfile.write(json_object)
+            else:
+                a = self.encoder.encode(corresponding_json)
+                with open(newpath, "wb") as outfile:
+                    outfile.write(a)
+        print("Written the word to file successfully")
+        return
+    
 
     def localParser(self):
         periodic_write_counter = 0
@@ -381,28 +421,23 @@ class Indexer():
                 #Periodic writing to the file
                 periodic_write_counter += 1
 
-                if(periodic_write_counter>0):
+                if(periodic_write_counter>1000):
                     num_file_writes += 1
                     print(str(num_file_writes) + ") successfully written to file")
-                    #self.compute_tf_idf_score() #uncomment for debugging 
-                    self.displayupdatedIndex()
 
-                    #self.write_num_words_to_file()
-                    self.updated_write_num_words_to_file()
+                    
+                    #self.displayupdatedIndex()
+
+                    #self.updated_write_num_words_to_file()
                     self.write_document_id_to_file()
 
                     self.updated_write_index_to_file()
-                    #print("This is the recovered index")
-                    #self.updated_read_index_from_file()
-                    if(periodic_write_counter==7):
-                        sys.exit()
 
-                    
-                    
-                    print()
-                    print()
-                    print()
-                    #periodic_write_counter = 0
+                    #if(periodic_write_counter==7):
+                        #sys.exit(0)
+                    #    return
+                    self.num_times_written_to_file += 1
+                    periodic_write_counter = 0
 
                     #return #uncomment for debugging 
 
@@ -414,8 +449,13 @@ if __name__ == "__main__":
     idx = Indexer()
     idx.generate_all_directories()
     idx.localParser()
-    idx.write_num_words_to_file()
 
+    
+    disk_index = idx.updated_compute_tf_idf_score()
+    idx.updated_write_index_to_file(disk_index)
+    idx.updated_write_num_words_to_file()
+    idx.write_wf_relation_to_file()
+    print(f"the number of times written to file is {idx.num_times_written_to_file}")
     #for i in range(5):
     #    print()
     #idx.delta_encode()
