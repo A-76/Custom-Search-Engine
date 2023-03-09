@@ -36,7 +36,7 @@ install instructions -
 class Indexer():
     save_path = "E:\\CS221JAVA\\saved"
     index = {}
-    document_to_id = {}
+    id_to_document = {}
 
     currFile = ''
     docID = -1
@@ -53,7 +53,7 @@ class Indexer():
         self.decoder = msgspec.json.Decoder()
 
         #Hyperparameter Values
-        self.num_files_per_letter = 10
+        self.num_files_per_letter = 25
         self.write_binary = True
 
         self.updatedIndex = {}
@@ -113,8 +113,8 @@ class Indexer():
         if(os.path.exists("./num_words.txt")):
             os.remove("./num_words.txt")
         
-        if(os.path.exists("./document_to_id.json")):
-            os.remove("./document_to_id.json")
+        if(os.path.exists("./id_to_document.json")):
+            os.remove("./id_to_document.json")
 
         if(os.path.exists("./TotalIndex.json")):
             os.remove("./TotalIndex.json")
@@ -130,17 +130,17 @@ class Indexer():
         
     def write_document_id_to_file(self):
         if(not self.write_binary):
-            json_object = json.dumps(self.document_to_id, indent = 4) 
+            json_object = json.dumps(self.id_to_document, indent = 4) 
 
-            with open("./document_to_id.json", "a+") as outfile:
+            with open("./id_to_document.json", "a+") as outfile:
                 outfile.write(json_object)
                  
         else:
-            a = self.encoder.encode(self.document_to_id)
-            with open("./document_to_id.json", "ab") as outfile:
+            a = self.encoder.encode(self.id_to_document)
+            with open("./id_to_document.json", "ab") as outfile:
                 outfile.write(a)
 
-        self.document_to_id.clear()
+        self.id_to_document.clear()
         return
 
     def create_file_to_word(self,file_number_dict):
@@ -286,7 +286,7 @@ class Indexer():
 
     def Stemming(self, words):
         stem_words = []
-        punct_lst = [",",".","?","!"]
+        punct_lst = [",",".","?","!","'"]
         if(self.stemmer == "porter"):
             porter_stemmer = PorterStemmer()
             word_pos = 0
@@ -307,33 +307,33 @@ class Indexer():
             snow_stemmer = SnowballStemmer(language='english')
             word_pos = 0
             for w in words:
-                #if(w in punct_lst):
-                #    continue
+                if(w in punct_lst):
+                    continue
 
-                if(w in self.total_word_lst):
-                    stemmedWord = snow_stemmer.stem(w)
-                    stem_words.append(stemmedWord)
-                    #self.addToIndex(stemmedWord,word_pos)
-                    self.updatedAddToIndex(stemmedWord,word_pos)
-                    self.update_word_to_file(stemmedWord)
-                    word_pos += 1
+                #if(w in self.total_word_lst):
+                stemmedWord = snow_stemmer.stem(w)
+                stem_words.append(stemmedWord)
+                #self.addToIndex(stemmedWord,word_pos)
+                self.updatedAddToIndex(stemmedWord,word_pos)
+                self.update_word_to_file(stemmedWord)
+                word_pos += 1
 
         else:
             # print("Using Default Stemmer")
             krovetz_stemmer = Stemmer()
             word_pos = 0
             for w in words:
-                #if(not w.isalnum()):  #need to change this
-                #    continue
+                if(not w.isalnum()):  #need to change this
+                    continue
 
-                if(w in self.total_word_lst):
-                    stemmedWord = krovetz_stemmer.stem(w)
-                    stem_words.append(stemmedWord)
-                    #self.addToIndex(stemmedWord,word_pos)
-                    #self.addToIndex(stemmedWord,word_pos)
-                    self.updatedAddToIndex(stemmedWord,word_pos)
-                    self.update_word_to_file(stemmedWord)
-                    word_pos += 1
+                #if(w in self.total_word_lst):
+                stemmedWord = krovetz_stemmer.stem(w)
+                stem_words.append(stemmedWord)
+                #self.addToIndex(stemmedWord,word_pos)
+                #self.addToIndex(stemmedWord,word_pos)
+                self.updatedAddToIndex(stemmedWord,word_pos)
+                self.update_word_to_file(stemmedWord)
+                word_pos += 1
 
         self.document_info[self.docID] = len(stem_words)
         return stem_words
@@ -377,9 +377,9 @@ class Indexer():
         document_count = 0
         num_file_writes = 0
 
-        if(Path("./document_to_id.json").is_file()):
+        if(Path("./id_to_document.json").is_file()):
             print("file exists")
-            os.remove("./document_to_id.json") 
+            os.remove("./id_to_document.json") 
 
         for root, dirs, files in os.walk(self.path, topdown=False):
             for name in files:
@@ -388,7 +388,7 @@ class Indexer():
 
                 self.currFile = name
                 self.docID = document_count
-                self.document_to_id[name] = self.docID
+                self.id_to_document[self.docID] =  name
                 document_count += 1
 
                 f = open(os.path.join(root, name))
@@ -420,7 +420,7 @@ class Indexer():
                 # Periodic writing to the file
                 periodic_write_counter += 1
 
-                if(periodic_write_counter > 10):  # why 1000
+                if(periodic_write_counter > 1000):  # why 1000
                     num_file_writes += 1
                     print(str(num_file_writes) + ") successfully written to file")
 
