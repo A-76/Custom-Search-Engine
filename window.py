@@ -1,4 +1,7 @@
 from tkinter import *
+
+import searcher as srch
+
 global entry
 global button
 global window
@@ -13,8 +16,11 @@ def searchbtn_clicked():
     # button.configure(command= close_win)
     # canvas.delete("all")
     # canvas.destroy()
-    print(keywords)
-    resultpage(keywords, ["result1", "result2", "result3"], "this search use 100ms")
+    s = srch.Searcher()
+    best_documents,time_taken = s.search(keywords)
+    for i in range(len(best_documents)):
+        best_documents[i] = str(best_documents[i])
+    resultpage(keywords, best_documents,'The time taken is ' + str(time_taken))
 
 
 def clear():

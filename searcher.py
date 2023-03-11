@@ -14,7 +14,7 @@ class Searcher():
         self.file_to_terms = {} #This dictionary will specify all the words present in a given file for ease of access.
         self.posting_lists = {}
 
-        #with open("./document_to_id.json", "r") as outfile:  #change it to id_to_document
+        #with open("./id_to_document.json", "r") as outfile:  #change it to id_to_document
         #    x = outfile.read()
 
         #self.id_to_document = self.decoder.decode(x)
@@ -73,8 +73,7 @@ class Searcher():
                         else:
                             self.file_to_terms[character][file_number] = [term]
                     else:
-                        print(f'The word "{term}" is not present in the dictionary.')
-                        
+                        print(f'The word "{term}" is not present in the dictionary.')                       
         return
     
     def __high_score__(self,best_documents,corresponding_tf_idf,document):
@@ -108,7 +107,37 @@ class Searcher():
     
 
     def __linear_merge__(self):
-        return
+        i = 0
+        j = 0
+        best_documents = [0 for i in range(self.K)]
+        corresponding_tf_idf = [0 for i in range(self.K)]
+
+        if((self.query[0] in self.posting_lists.keys()) and (self.query[1] in self.posting_lists.keys())):
+            print("gfs")
+            plist_1 = self.posting_lists[self.query[0]]
+            plist_2 = self.posting_lists[self.query[1]]
+            while(i< len(plist_1) and j < len(plist_2)):
+                if(plist_1[i][0] == plist_2[j][0]):
+                    #common_documents.append(plist_1[i][0])
+                    tfidf1 = plist_1[i][-1]
+                    tfidf2 = plist_2[j][-1]
+                    if(type(tfidf1) == list):
+                        tfidf1 =0
+                    if(type(tfidf2)==list):
+                        tfidf2 =0
+
+                    #corresponding_tf_idf.append(tfidf1+tfidf2)
+                    document = [plist_1[i][0],[0,0,0],tfidf1+tfidf2]
+                    best_documents,corresponding_tf_idf = self.__high_score__(best_documents,corresponding_tf_idf,document)
+                    i+=1
+                    j+=1
+
+                elif(plist_1[i][0] > plist_2[j][0]):
+                    j+= 1
+                else:
+                    i+=1
+        
+        return best_documents
     
     def display_top_results(self):
         best_documents = [0 for i in range(self.K)]
@@ -130,11 +159,11 @@ class Searcher():
                 #ctr += 1  
         else:
             #Need to perform a linear merge to obtain the best results
-
-            pass
-        print("The most relevavnt documents are - ")
+            best_documents = self.__linear_merge__()
+            
+        print("The most relevant documents are - ")
         print(best_documents)
-        return
+        return best_documents
     
     def search(self,query):
         #print(f"Your query is {query.split()}")
@@ -146,10 +175,10 @@ class Searcher():
         self.query = query.split()
         self.find_relevant_word_to_file()
         self.get_postings_for_query()
-        self.display_top_results()
+        best_documents = self.display_top_results()
         duration = time.time() - start_time
         print(f"The time taken for retrieving the posting list is {duration} seconds")
-        return
+        return best_documents,duration
          
 
 
