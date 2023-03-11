@@ -108,9 +108,9 @@ def resultpage(key, results, str_time):
         fill="#941010",
         font=("None", int(15.0)))
     resultsBox = canvas.create_text(
-        130.0, 270,
+        130.0, 170,
         text="results list",
-        anchor=SW,
+        anchor=NW,
         fill="#000000",
         font=("None", int(20.0)))
     
