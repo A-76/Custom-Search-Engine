@@ -14,7 +14,7 @@ def searchbtn_clicked():
     # canvas.delete("all")
     # canvas.destroy()
     print(keywords)
-    resultpage(keywords, ["result1", "result2", "result3"], "this search use 100ms")
+    resultpage(keywords, ["result1","result1","result1","result1", "result2", "result3"], "this search use 100ms")
 
 
 def clear():
@@ -102,9 +102,9 @@ def resultpage(key, results, str_time):
         fill="#941010",
         font=("None", int(15.0)))
     resultsBox = canvas.create_text(
-        130.0, 270,
+        130.0, 170,
         text="results list",
-        anchor=SW,
+        anchor=NW,
         fill="#000000",
         font=("None", int(20.0)))
     

@@ -233,6 +233,32 @@ class Indexer():
             self.updatedIndex[char].clear()
         return
 
+    def PR(self):
+        print("computed the PageRank score")
+        print("computed the tf idf score")
+        #Executed at the end once the entire corpus is indexed
+        disk_index = self.updated_read_index_from_file()
+
+        for char in disk_index:
+            for word in disk_index[char]:
+                num_document_occurrences = len(disk_index[char][word])   #Number of documents in which the word occurred
+
+                idf = np.log((self.docID+1)/num_document_occurrences)
+
+                #now computing tf for every document in which the word occurred
+                for document in disk_index[char][word]:
+                    num_occurrences_in_doc =  len(document[1]) 
+                    num_words_in_doc = self.document_info[document[0]]
+                    tf = float(num_occurrences_in_doc)/num_words_in_doc
+                    tf_idf = float(tf*idf)
+                    if(len(document) == 2):
+                        document.append(tf_idf)
+                    else:
+                        document[2] = tf_idf
+
+        #self.displayupdatedIndex(disk_index)s
+        return disk_index
+    
     def updated_compute_tf_idf_score(self):
         print("computed the tf idf score")
         #Executed at the end once the entire corpus is indexed
