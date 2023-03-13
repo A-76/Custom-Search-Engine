@@ -291,25 +291,29 @@ class Indexer():
             porter_stemmer = PorterStemmer()
             word_pos = 0
             for w in words:
-                #if(not w.isalnum()):  #need to change this
-                #    continue
+                if(not w.isalnum()):  #need to change this
+                    continue
 
-                if(w in self.total_word_lst):
-                    stemmedWord = krovetz_stemmer.stem(w)
-                    stem_words.append(stemmedWord)
-                    #self.addToIndex(stemmedWord,word_pos)
-                    #self.addToIndex(stemmedWord,word_pos)
-                    self.updatedAddToIndex(stemmedWord,word_pos)
-                    self.update_word_to_file(stemmedWord)
-                    word_pos += 1
+                if(len(w) == 1 and ((w != 'a') and (w != 'i'))):
+                    continue
+               
+                stemmedWord = krovetz_stemmer.stem(w)
+                stem_words.append(stemmedWord)
+                #self.addToIndex(stemmedWord,word_pos)
+                #self.addToIndex(stemmedWord,word_pos)
+                self.updatedAddToIndex(stemmedWord,word_pos)
+                self.update_word_to_file(stemmedWord)
+                word_pos += 1
 
         elif(self.stemmer == "snowball"):
             snow_stemmer = SnowballStemmer(language='english')
             word_pos = 0
             for w in words:
-                if(w in punct_lst):
+                if(not w.isalnum()):  #need to change this
                     continue
 
+                if(len(w) == 1 and ((w != 'a') and (w != 'i'))):
+                    continue
                 #if(w in self.total_word_lst):
                 stemmedWord = snow_stemmer.stem(w)
                 stem_words.append(stemmedWord)
@@ -326,6 +330,8 @@ class Indexer():
                 if(not w.isalnum()):  #need to change this
                     continue
 
+                if(len(w) == 1 and ((w != 'a') and (w != 'i'))):
+                    continue
                 #if(w in self.total_word_lst):
                 stemmedWord = krovetz_stemmer.stem(w)
                 stem_words.append(stemmedWord)
