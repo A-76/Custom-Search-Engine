@@ -14,12 +14,15 @@ class Searcher():
         self.file_to_terms = {} #This dictionary will specify all the words present in a given file for ease of access.
         self.posting_lists = {}
 
+        #boolean var to see if all the terms are present or not
+        self.final_valid_query = []
         #with open("./id_to_document.json", "r") as outfile:  #change it to id_to_document
         #    x = outfile.read()
 
         #self.id_to_document = self.decoder.decode(x)
         #
-        self.K = 10 #returns the top 10 results
+        self.K = 15 #returns the top 10 results
+        self.boost_val = 5
         return
     
     def get_postings_for_query(self):
@@ -65,46 +68,84 @@ class Searcher():
 
             for term in character_to_query[character]:
                     if(term in word_to_file.keys()):
-                        print("Word is present in the dictionary")
+                        #print("Word is present in the dictionary")
                         file_number = word_to_file[term]
                         self.term_to_file[term] = file_number
+
+                        position_of_term_in_query  = query.index(term)
+
+                        self.final_valid_query.append([term,position_of_term_in_query])
                         if(file_number in self.file_to_terms[character].keys()):
                             self.file_to_terms[character][file_number].append(term)
                         else:
                             self.file_to_terms[character][file_number] = [term]
                     else:
-                        print(f'The word "{term}" is not present in the dictionary.')                       
+                        self.term_to_file[term] = -1 #the term is not present
+
+                        #print(f'The word "{term}" is not present in the dictionary.')                       
         return
     
-    def __high_score__(self,best_documents,corresponding_tf_idf,document):
-        if(type(document[-1])==list):
-            document.append(0)
-        best_documents.append(document[0])
-        corresponding_tf_idf.append(document[-1])
-        #print(document)
-        for i in range (self.K,0,-1):
+    def __high_score__(self,best_documents,corresponding_tf_idf,document,existing_doc_index = -1):
+        if(existing_doc_index== -1): 
+            if(type(document[-1])==list):
+                document.append(0)
+
+            best_documents.append(document[0])
+            corresponding_tf_idf.append(document[-1])
             #print(document)
-            #print(corresponding_tf_idf[i])
-            #print(corresponding_tf_idf[i-1])
-            #print()
-            #there is some issue here, for some instances there is no tf-idf being computed
             
-            if(corresponding_tf_idf[i] > corresponding_tf_idf[i-1]):
-                #need to swap the value
-                new_doc = best_documents[i]
-                new_tf_idf = corresponding_tf_idf[i]
+            for i in range (self.K,0,-1):
+                #print(document)
+                #print(corresponding_tf_idf[i])
+                #print(corresponding_tf_idf[i-1])
+                #print()
+                #there is some issue here, for some instances there is no tf-idf being computed
+                
+                if(corresponding_tf_idf[i] > corresponding_tf_idf[i-1]):
+                    #need to swap the value
+                    new_doc = best_documents[i]
+                    new_tf_idf = corresponding_tf_idf[i]
 
-                best_documents[i] = best_documents[i-1]
-                corresponding_tf_idf[i] = corresponding_tf_idf[i-1]
+                    best_documents[i] = best_documents[i-1]
+                    corresponding_tf_idf[i] = corresponding_tf_idf[i-1]
 
-                best_documents[i-1] = new_doc
-                corresponding_tf_idf[i-1] = new_tf_idf
-            
-            else:
-                break
-                 
-        return best_documents[:-1],corresponding_tf_idf[:-1] #discarding the K + 1 entry
+                    best_documents[i-1] = new_doc
+                    corresponding_tf_idf[i-1] = new_tf_idf
+                
+                else:
+                    break
+                    
+            return best_documents[:-1],corresponding_tf_idf[:-1] #discarding the K + 1 entry
+        else:
+            for i in range (existing_doc_index,0,-1):
+                #print(document)
+                #print(corresponding_tf_idf[i])
+                #print(corresponding_tf_idf[i-1])
+                #print()
+                #there is some issue here, for some instances there is no tf-idf being computed
+                
+                if(corresponding_tf_idf[i] > corresponding_tf_idf[i-1]):
+                    #need to swap the value
+                    new_doc = best_documents[i]
+                    new_tf_idf = corresponding_tf_idf[i]
+
+                    best_documents[i] = best_documents[i-1]
+                    corresponding_tf_idf[i] = corresponding_tf_idf[i-1]
+
+                    best_documents[i-1] = new_doc
+                    corresponding_tf_idf[i-1] = new_tf_idf
+                
+                else:
+                    break
+                    
+            return best_documents,corresponding_tf_idf #discarding the K + 1 entry
     
+    def delta_decode(self,lst):
+        decoded_lst = lst.copy()
+        for i in range(1,len(lst)):
+            decoded_lst[i] += decoded_lst[i - 1] 
+
+        return decoded_lst
 
     def __linear_merge__(self):
         i = 0
@@ -113,7 +154,7 @@ class Searcher():
         corresponding_tf_idf = [0 for i in range(self.K)]
 
         if((self.query[0] in self.posting_lists.keys()) and (self.query[1] in self.posting_lists.keys())):
-            print("gfs")
+            #print("gfs")
             plist_1 = self.posting_lists[self.query[0]]
             plist_2 = self.posting_lists[self.query[1]]
             while(i< len(plist_1) and j < len(plist_2)):
@@ -139,13 +180,122 @@ class Searcher():
         
         return best_documents
     
-    def display_top_results(self):
-        best_documents = [0 for i in range(self.K)]
-        corresponding_tf_idf = [0 for i in range(self.K)]
-        ctr = 0
-        if(len(self.query)==1):
+
+    def __parse_positions__(self,positions_term1,positions_term2,required_positional_diff):
+        #We are basically boosting the cumulativev tf-idf score by a value of 10 for a document when the pair of words occur as in the query
+        i = 0
+        j = 0
+
+        decoded_positions1 = self.delta_decode(positions_term1)
+        decoded_positions2 = self.delta_decode(positions_term2)
+
+        increment_factor = 0
+        #print(f"The required positional diff is {required_positional_diff}")
+        while(i< len(decoded_positions1) and j < len(decoded_positions2)):
+            if(decoded_positions2[j] - decoded_positions1[i] == required_positional_diff):
+                #the words are next to each other
+                #print(f"The positions are {decoded_positions2[j]} and {decoded_positions1[i]}")
+                increment_factor += self.boost_val
+                i+= 1
+                j+= 1
+            elif(decoded_positions2[j] - decoded_positions1[i] > required_positional_diff):
+                i+=1
+            else:
+                j+=1
+
+        return increment_factor
+    
+
+    def __positional_linear_merge__(self,lower_term_idx,upper_term_idx,positional_difference,best_documents,corresponding_tf_idf):
+        #print(positional_difference)
+        #print(lower_term_idx)
+        #print(upper_term_idx)
+        i = 0
+        j = 0
+
+        #print(self.query[lower_term_idx])
+        #print(self.query[upper_term_idx])
+        #print(self.posting_lists.keys())
+        if((self.final_valid_query[lower_term_idx][0] in self.posting_lists.keys()) and (self.final_valid_query[upper_term_idx][0] in self.posting_lists.keys())):
+
+            plist_1 = self.posting_lists[self.final_valid_query[lower_term_idx][0]]
+            plist_2 = self.posting_lists[self.final_valid_query[upper_term_idx][0]]
+
+            while(i< len(plist_1) and j < len(plist_2)):
+                if(plist_1[i][0] == plist_2[j][0]):
+
+                    #perform positional_parsing here - 
+                    #print(plist_1)
+                    #print(plist_2)
+                    try:
+                        additional_tf_idf = self.__parse_positions__(plist_1[i][1],plist_2[j][1],positional_difference)
+                    except:
+                        print(plist_1[i][1])
+                        print(plist_2)
+                    #print(additional_tf_idf)
+                    tfidf1 = plist_1[i][-1]
+                    tfidf2 = plist_2[j][-1]
+
+                    if(type(tfidf1) == list):
+                        tfidf1 =0
+                    if(type(tfidf2)==list):
+                        tfidf2 =0
+
+                    #corresponding_tf_idf.append(tfidf1+tfidf2)
+                    if(plist_1[i][0] in best_documents):
+                        #this can happen in queries with more than 2 words. 
+                        #print(f"The document appeared twice {plist_1[i][0]}")
+                        curr_rank = best_documents.index(plist_1[i][0])
+                        #print(f"The old tf idf of the doc is {corresponding_tf_idf[curr_rank]}")
+                        #document = [plist_1[i][0],[0,0,0],corresponding_tf_idf[curr_rank] + additional_tf_idf] #we will insert document number again but its fine.
+                        #we only need to resort the portion of the list that is ranked higher than the existing document.
+                        corresponding_tf_idf[curr_rank] +=  additional_tf_idf
+                        #print(f"The new tf idf of the doc is {corresponding_tf_idf[curr_rank]}")
+                        #print("The old documents list and the corresponding tf-idf is ")
+                        #print(best_documents)
+                        #print(corresponding_tf_idf)
+                        #print()
+                        best_documents,corresponding_tf_idf = self.__high_score__(best_documents,corresponding_tf_idf,[],curr_rank)
+                        
+                        #print("The new documents list and the corresponding tf-idf is ")
+                        #print(best_documents)
+                        #print(corresponding_tf_idf)
+                        #print()
+                    else:
+                        document = [plist_1[i][0],[0,0,0],tfidf1+tfidf2+additional_tf_idf]
+                        #for queries with exactly 2 words
+                        best_documents,corresponding_tf_idf = self.__high_score__(best_documents,corresponding_tf_idf,document)
+                    i+=1
+                    j+=1
+
+                elif(plist_1[i][0] > plist_2[j][0]):
+                    j+= 1
+                else:
+                    i+=1
+        
+        return best_documents,corresponding_tf_idf
+    
+    
+    def positional_search_for_query(self,lower_term_idx,upper_term_idx,best_documents,corresponding_tf_idf):
+        '''
+        1) all words present in the query must exist 
+        2) if any word does not exist then just return the documents the documents common to the words ignoring position
+        '''
+
+        positional_difference = self.final_valid_query[upper_term_idx][1] - self.final_valid_query[lower_term_idx][1]
+        best_documents,corresponding_tf_idf = self.__positional_linear_merge__(lower_term_idx,upper_term_idx,positional_difference,best_documents,corresponding_tf_idf)
+        return best_documents,corresponding_tf_idf
+    
+        
+    
+    def display_top_results(self): 
+        best_documents1 = []
+        if(len(self.final_valid_query)==1):
+            best_documents = [0 for i in range(self.K)]
+            corresponding_tf_idf = [0 for i in range(self.K)]
+            ctr = 0
             #Single term query, only need to display the top rankings based on tf-idf at the moment
-            posting_list = self.posting_lists[self.query[0]]
+            posting_list = self.posting_lists[self.final_valid_query[0][0]]
             for document in posting_list:
                 #print("The document is ")
                 #print(document)
@@ -158,11 +308,21 @@ class Searcher():
                 #     return
                 #ctr += 1  
         else:
-            #Need to perform a linear merge to obtain the best results
-            best_documents = self.__linear_merge__()
+            i = 0
+            j = 1
+            best_documents = [0 for i in range(self.K)]
+            corresponding_tf_idf = [0 for i in range(self.K)]
+            print(self.final_valid_query)
+            while(j<len(self.final_valid_query)):
+                best_documents,corresponding_tf_idf = self.positional_search_for_query(i,j,best_documents,corresponding_tf_idf)
+                i+=1
+                j+=1
+
+            #best_documents1 = self.__linear_merge__()
             
         print("The most relevant documents are - ")
         print(best_documents)
+        #print(best_documents1)
         return best_documents
     
     def search(self,query):
@@ -180,8 +340,6 @@ class Searcher():
         print(f"The time taken for retrieving the posting list is {duration} seconds")
         return best_documents,duration
          
-
-
 
 if __name__ == "__main__":
     query = input("Enter your query! \n")
