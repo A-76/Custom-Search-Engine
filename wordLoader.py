@@ -53,7 +53,7 @@ class Indexer():
         self.decoder = msgspec.json.Decoder()
 
         #Hyperparameter Values
-        self.num_files_per_letter = 25
+        self.num_files_per_letter = 30
         self.write_binary = True
 
         self.updatedIndex = {}
@@ -294,10 +294,10 @@ class Indexer():
                 if(not w.isalnum()):  #need to change this
                     continue
 
-                if(len(w) == 1 and ((w != 'a') and (w != 'i'))):
+                if(len(w) == 1 and ((w != 'a') and (w != 'i')) and not w.isnumeric()):
                     continue
                
-                stemmedWord = krovetz_stemmer.stem(w)
+                stemmedWord = porter_stemmer.stem(w)
                 stem_words.append(stemmedWord)
                 #self.addToIndex(stemmedWord,word_pos)
                 #self.addToIndex(stemmedWord,word_pos)
@@ -312,7 +312,7 @@ class Indexer():
                 if(not w.isalnum()):  #need to change this
                     continue
 
-                if(len(w) == 1 and ((w != 'a') and (w != 'i'))):
+                if(len(w) == 1 and ((w != 'a') and (w != 'i')) and not w.isnumeric()):
                     continue
                 #if(w in self.total_word_lst):
                 stemmedWord = snow_stemmer.stem(w)
@@ -330,7 +330,7 @@ class Indexer():
                 if(not w.isalnum()):  #need to change this
                     continue
 
-                if(len(w) == 1 and ((w != 'a') and (w != 'i'))):
+                if(len(w) == 1 and ((w != 'a') and (w != 'i')) and not w.isnumeric()):
                     continue
                 #if(w in self.total_word_lst):
                 stemmedWord = krovetz_stemmer.stem(w)
@@ -401,9 +401,9 @@ class Indexer():
 
                 b_raw = json.load(f)
                 html = b_raw["content"]
-                soup = BeautifulSoup(html, "html.parser")
+                soup = BeautifulSoup(html, "lxml")
             
-                for data in soup(['style', 'script', 'a']):
+                for data in soup(['style', 'script']):
                     data.decompose()
             
                 # data by retrieving the tag content
