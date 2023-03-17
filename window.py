@@ -1,12 +1,12 @@
 from tkinter import *
-
+import tkinter as tk
 import searcher as srch
 
 global entry
 global button
 global window
 global canvas
-
+global predicted_word
 
 def searchbtn_clicked():
     global entry
@@ -17,11 +17,13 @@ def searchbtn_clicked():
     # canvas.delete("all")
     # canvas.destroy()
     s = srch.Searcher()
-    best_documents,time_taken = s.search(keywords)
+    best_documents_text,best_documents,time_taken  = s.search(keywords)
     for i in range(len(best_documents)):
         best_documents[i] = str(best_documents[i])
-    resultpage(keywords, best_documents,'The time taken is ' + str(time_taken))
+    resultpage(keywords,best_documents_text ,best_documents,'The time taken is ' + str(time_taken))
 
+def voicebtn_clicked():
+    print("voice")
 
 def clear():
     global canvas
@@ -68,6 +70,7 @@ def searchpage():
         height=56)
 
     img0 = PhotoImage(file=f"img0.png")
+    vimg0 = PhotoImage(file=f"vimg0.png")
     button = Button(
         image=img0,
         borderwidth=0,
@@ -75,14 +78,34 @@ def searchpage():
         command=searchbtn_clicked,
         relief="flat")
     button.place(
-        x=614, y=455,
+        x=475, y=455,
+        width=210,
+        height=53)
+    voicebutton = Button(
+        text="Voice Search",
+        font=25,
+        borderwidth=0,
+        highlightthickness=0,
+        command=voicebtn_clicked,
+        relief="flat")
+    voicebutton.place(
+        x=770, y=455,
         width=210,
         height=53)
     window.mainloop()
 
+def motion(event):
+    global predicted_word
+    print("test")
+    s = srch.Searcher()
+    best_documents_text,best_documents,time_taken  = s.search(predicted_word)
+    for i in range(len(best_documents)):
+        best_documents[i] = str(best_documents[i])
+    resultpage(predicted_word,best_documents_text ,best_documents,'The time taken is ' + str(time_taken))
+    return
 
 # Result page
-def resultpage(key, results, str_time):
+def resultpage(key, best_documents_text,results, str_time):
     global entry
     global button
     global window
@@ -107,17 +130,37 @@ def resultpage(key, results, str_time):
         anchor=SW,
         fill="#941010",
         font=("None", int(15.0)))
-    resultsBox = canvas.create_text(
+
+    
+    str_result = ""
+    ctr = 1
+    int_sum = 0
+    for i in range(len(results)):
+        #print(results[i])
+        int_sum += int(results[i])
+    if(int_sum==0):
+        global predicted_word
+        predicted_word ="hello"
+        str_result = 'Did you mean "' + predicted_word + '"?'
+        #canvas.itemconfig(resultsBox, text=str_result)
+        resultsBox = Message(canvas,text=str_result,width=938,bg="#FFFFFF",anchor='w' ,justify=tk.RIGHT,font=('times',20))
+        resultsBox.config(justify=LEFT)
+        resultsBox.bind('<ButtonRelease-1>',motion)
+        resultsBox.place(
+        x=130, y=170,
+        width=938,
+        height=45)
+    else:
+        resultsBox = canvas.create_text(
         130.0, 170,
         text="results list",
         anchor=NW,
         fill="#000000",
         font=("None", int(20.0)))
-    
-    str_result = ""
-    for result in results:
-        str_result = str_result + key + " " + result + '\n'
-    canvas.itemconfig(resultsBox, text=str_result)
+        for result in best_documents_text:
+            str_result = str_result + str(ctr) + " " + result + '\n'
+            ctr+=1
+        canvas.itemconfig(resultsBox, text=str_result)
 
     entry1_img = PhotoImage(file=f"img_textBox1.png")
     entry1_bg = canvas.create_image(
