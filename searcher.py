@@ -4,6 +4,8 @@ import os
 import json
 import sys
 import time
+from nltk.tokenize import word_tokenize
+from krovetzstemmer import Stemmer
 
 class Searcher():
     def __init__(self):
@@ -16,10 +18,10 @@ class Searcher():
 
         #boolean var to see if all the terms are present or not
         self.final_valid_query = []
-        #with open("./id_to_document.json", "r") as outfile:  #change it to id_to_document
-        #    x = outfile.read()
+        with open("./id_to_document1.json", "r") as outfile:  #change it to id_to_document
+            x = outfile.read()
 
-        #self.id_to_document = self.decoder.decode(x)
+        self.id_to_document = self.decoder.decode(x)
         #
         self.K = 15 #returns the top 10 results
         self.boost_val = 5
@@ -60,7 +62,11 @@ class Searcher():
         character_to_query =  self.__character_to_query__(query)
 
         for character in character_to_query:
-            word_to_file_location = basepath + character + "/word_to_file.json"
+            if(character.isalpha()):  #If the word is not an alphabet then directory is "extra"
+                word_to_file_location = basepath + character + "/word_to_file.json"
+            else:
+                word_to_file_location = basepath + "extra" + "/word_to_file.json"
+
             with open(word_to_file_location, "r") as outfile:
                         x = outfile.read()
             word_to_file = self.decoder.decode(x)
@@ -325,20 +331,50 @@ class Searcher():
         #print(best_documents1)
         return best_documents
     
+    def map_id_to_document(self,best_documents):
+        results = []
+        #print(self.id_to_document.keys())
+        for docID in best_documents:
+            try:
+                results.append(self.id_to_document[str(docID)])
+            except:
+                print(docID)
+        return results
+    
+
+    def tokenize_query(self,query):
+        stem_words = []
+        words = word_tokenize(query.lower())
+
+        krovetz_stemmer = Stemmer()
+        for w in words:
+            if(not w.isalnum()):  #need to change this
+                continue
+
+            if(len(w) == 1 and ((w != 'a') and (w != 'i')) and not w.isnumeric()): #this disregards numbers need to change that.
+                continue
+            #if(w in self.total_word_lst):
+            stemmedWord = krovetz_stemmer.stem(w)
+            stem_words.append(stemmedWord)
+
+        return stem_words
+
     def search(self,query):
         #print(f"Your query is {query.split()}")
         if(query==''):
             return
         
         start_time = time.time()
-        query = query.lower()
-        self.query = query.split()
+        #query = query.lower()
+        self.query = self.tokenize_query(query)
         self.find_relevant_word_to_file()
         self.get_postings_for_query()
         best_documents = self.display_top_results()
         duration = time.time() - start_time
+        best_documents_text = self.map_id_to_document(best_documents)
+        #print(best_documents_text)
         print(f"The time taken for retrieving the posting list is {duration} seconds")
-        return best_documents,duration
+        return best_documents_text,best_documents,duration            #best_documents,duration
          
 
 if __name__ == "__main__":
