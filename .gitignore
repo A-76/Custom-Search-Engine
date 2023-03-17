@@ -3,3 +3,6 @@
 developer/
 IndexStructure/
 num_words.txt
+*.model
+*.npy
+*.png
