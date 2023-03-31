@@ -40,7 +40,7 @@ def read_doc_id__from_file():
         return id_to_document
 
 if __name__ == "__main__":
-    path = "./developer/DEV/"
+    path = "./developer/DEV/" #"/home/adithya/Desktop/trial/tempTotalDoc/" #
     id_to_document = {}
     document_count = 0
     periodic_write_counter = 0
@@ -53,32 +53,21 @@ if __name__ == "__main__":
 
                 currFile = name
                 docID = document_count
-                id_to_document[docID] =  name
-                document_count += 1
+                
 
                 f = open(os.path.join(root, name))
 
                 b_raw = json.load(f)
-                html = b_raw["content"]
-                soup = BeautifulSoup(html, "html.parser")
 
-                for data in soup(['style', 'script', 'a']):
-                    data.decompose()
-            
-                # data by retrieving the tag content
-                alltxtcontent = ' '.join(soup.stripped_strings)
-                #print(alltxtcontent)
-                result = hashlib.md5(html.encode())
-                #print()
-                #print(result.hexdigest())
+                id_to_document[docID] =  [name,b_raw["url"]]
+                document_count += 1
 
-                #words = word_tokenize(alltxtcontent.lower())
                 periodic_write_counter += 1
                 if(periodic_write_counter > 1000):  # why 1000
                     num_file_writes += 1
                     print(str(num_file_writes) + ") successfully written to file")
                     periodic_write_counter = 0
-                    break
+                    #break
 
     write_document_id_to_file(id_to_document)
     read_doc_id__from_file()

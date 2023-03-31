@@ -6,3 +6,6 @@ num_words.txt
 *.model
 *.npy
 *.png
+*.pyc
+*.npz
+*.pkl
