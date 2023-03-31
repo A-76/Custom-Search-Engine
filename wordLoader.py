@@ -7,6 +7,7 @@ from nltk.tokenize import word_tokenize
 from nltk.corpus import words
 import shutil
 import random
+import pickle
 
 #nltk.download('words')
 #nltk.download('punkt')
@@ -20,6 +21,7 @@ import msgspec
 import numpy as np
 from collections import defaultdict
 
+from scipy.sparse import csr_matrix,save_npz,lil_matrix
 '''
 install instructions - 
 1) pip3 install nltk
@@ -45,20 +47,22 @@ class Indexer():
     document_info = {}
 
     num_times_written_to_file = 0
-    def __init__(self,path="./developer/DEV/",stemmer="krovetz"):
+    def __init__(self,path="./developer/DEV/",stemmer="krovetz",indexPath = "./IndexStructure/"):
         self.path = path
         self.stemmer = stemmer
-        self.total_word_lst = set(w.lower() for w in nltk.corpus.words.words())
+        self.indexPath = indexPath
+
         self.encoder = msgspec.json.Encoder()
         self.decoder = msgspec.json.Decoder()
 
         #Hyperparameter Values
-        self.num_files_per_letter = 30
+        self.num_files_per_letter = 40
         self.write_binary = True
 
         self.updatedIndex = {}
         self.word_to_file = {}
-
+    
+        self.total_number_of_words = 0
         return
     
     def updatedAddToIndex(self,word,position):
@@ -90,8 +94,7 @@ class Indexer():
         return
     
     def generate_all_directories(self):
-        path = "./IndexStructure/"
-
+        path = self.indexPath
         if(os.path.exists(path)):
             self.destroy_all_directories()
 
@@ -108,7 +111,7 @@ class Indexer():
         return
     
     def destroy_all_directories(self):
-        path = "./IndexStructure/"
+        path = self.indexPath
         shutil.rmtree(path)
         if(os.path.exists("./num_words.txt")):
             os.remove("./num_words.txt")
@@ -126,7 +129,8 @@ class Indexer():
             for key in self.word_to_file.keys():
                 total_words += len(self.word_to_file[key].keys())
             outfile.write(str(total_words))
-        return
+        self.total_number_of_words = total_words
+        return total_words
         
     def write_document_id_to_file(self):
         if(not self.write_binary):
@@ -159,7 +163,7 @@ class Indexer():
         return corresponding_json
 
     def updated_read_index_from_file(self):
-        basepath = "./IndexStructure/"
+        basepath = self.indexPath
         disk_index = {}
         for char in self.updatedIndex:
             for file_number in range(1,self.num_files_per_letter+1):
@@ -213,7 +217,7 @@ class Indexer():
         else:
             self.merge(index)
 
-        basepath = "./IndexStructure/"
+        basepath = self.indexPath
         for char in self.updatedIndex:
             res = self.create_file_to_word(self.word_to_file[char])
             for file_number in res.keys():
@@ -361,7 +365,7 @@ class Indexer():
         
 
     def write_wf_relation_to_file(self):
-        basepath = "./IndexStructure/"
+        basepath = self.indexPath
         for char in self.word_to_file:
             newpath = basepath + char + "/word_to_file.json"
 
@@ -377,7 +381,77 @@ class Indexer():
         print("Written the word to file successfully")
         return
     
+    '''
+    def generate_term_document_matrix(self,diskIndex):
 
+        tdm = 
+        tdm_1 = np.zeros((self.total_number_of_words, int((self.docID+1)/4)+1),dtype=np.int8)
+        tdm_2 = np.zeros((self.total_number_of_words, int((self.docID+1)/4)+1),dtype=np.int8)
+        tdm_3 = np.zeros((self.total_number_of_words, int((self.docID+1)/4)+1),dtype=np.int8)
+        tdm_4 = np.zeros((self.total_number_of_words, int((self.docID+1)/4)+1),dtype=np.int8)
+
+        LL = int((self.docID+1)/4)+1
+
+        word_to_row_number = {}
+        word_number = 0
+        for char in diskIndex:
+                for word in diskIndex[char]:
+                    word_to_row_number[word] = word_number
+                    for document in diskIndex[char][word]:
+                        if(document[0] < LL):
+                            tdm_1[word_number][document[0]] = len(document[1])
+                        elif(document[0] >= LL and document[0] < 2*LL):
+                            tdm_2[word_number][document[0] - LL] = len(document[1])
+                        elif(document[0] >= 2*LL and document[0] < 3*LL):
+                            tdm_3[word_number][document[0] -2*LL] = len(document[1])
+                        else:
+                            tdm_4[word_number][document[0] -3*LL] = len(document[1])
+                    word_number += 1
+
+        np.save("./term_documents/term_document_matrix1.npy",tdm_1)
+        np.save("./term_documents/term_document_matrix2.npy",tdm_2)
+        np.save("./term_documents/term_document_matrix3.npy",tdm_3)
+        np.save("./term_documents/term_document_matrix4.npy",tdm_4)
+        print("Saved the matrix successfully")
+
+        path = "./word_to_row.json"
+
+        a = self.encoder.encode(word_to_row_number)
+        with open(path, "wb") as outfile:
+            outfile.write(a)
+
+        print("Written the word to file successfully")
+        return tdm_1,tdm_2,tdm_3,tdm_4,word_to_row_number
+    '''
+
+    def generate_term_document_matrix(self,diskIndex):
+
+        tdm = lil_matrix((self.total_number_of_words, self.docID+1), dtype=np.int8)
+        print(tdm.shape)
+        word_to_row_number = {}
+        word_number = 0
+        for char in diskIndex:
+                for word in diskIndex[char]:
+                    for document in diskIndex[char][word]:
+                        word_to_row_number[word] = word_number
+                        tdm[word_number,document[0]] = len(document[1])
+                    word_number += 1
+
+        print("Saved the matrix successfully")
+
+        with open("sparse_tdm.pkl",'wb') as f:
+            pickle.dump(tdm,f)
+
+        #save_npz("sparse_tdm.npz",tdm)
+        path = "./word_to_row.json"
+
+        a = self.encoder.encode(word_to_row_number)
+        with open(path, "wb") as outfile:
+            outfile.write(a)
+
+        print("Written the word to file successfully")
+        return tdm,word_to_row_number
+    
     def localParser(self):
         periodic_write_counter = 0
         document_count = 0
@@ -394,12 +468,15 @@ class Indexer():
 
                 self.currFile = name
                 self.docID = document_count
-                self.id_to_document[self.docID] =  name
-                document_count += 1
+                
 
                 f = open(os.path.join(root, name))
 
                 b_raw = json.load(f)
+
+                self.id_to_document[self.docID] =  [name,b_raw["url"]]
+                document_count += 1
+
                 html = b_raw["content"]
                 soup = BeautifulSoup(html, "lxml")
             
@@ -452,16 +529,27 @@ class Indexer():
 if __name__ == "__main__":
 
 
-    idx = Indexer()
+    idx =  Indexer() #Indexer(path="/home/adithya/Desktop/trial/tempTotalDoc/",indexPath="/home/adithya/Desktop/trial/tempIndex/")
     idx.generate_all_directories()
     idx.localParser()
 
-    
+    idx.write_document_id_to_file()
     disk_index = idx.updated_compute_tf_idf_score()
     idx.updated_write_index_to_file(disk_index)
     idx.updated_write_num_words_to_file()
     idx.write_wf_relation_to_file()
     print(f"the number of times written to file is {idx.num_times_written_to_file}")
+
+    #generate term document matrix
+    print("Calculating the term document matrix")
+    final_disk_index = idx.updated_read_index_from_file()
+    tdm,word_to_row_number = idx.generate_term_document_matrix(final_disk_index)
+    #print(tdm.shape)
+    
+    #print(tdm)
+
+
+    #np.zeros((num_words,num_documents))
     #for i in range(5):
     #    print()
     #idx.delta_encode()
