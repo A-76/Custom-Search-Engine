@@ -1,29 +1,106 @@
 from tkinter import *
 import tkinter as tk
 import searcher as srch
+import numpy as np
+import msgspec
+import json
+import gensim
+from gensim.models import FastText
+import speech_recognition as sr
 
 global entry
 global button
 global window
 global canvas
 global predicted_word
+global tdm,word_to_row 
+global fasttext_model
+global isVoice,voice_query 
+isVoice = False
+
+global cache,prev_queries,memory_length
+prev_queries = []
+cache = {}
+memory_length = 1
 
 def searchbtn_clicked():
     global entry
     global canvas
-    keywords = entry.get()
-    clear()
+    global tdm,word_to_row 
+    global keywords
+    global isVoice,voice_query
+    global cache,memory_length,prev_queries
+    if(not isVoice):
+        keywords = entry.get()
+        clear()
+    else:
+        keywords = voice_query
+        isVoice = False
     # button.configure(command= close_win)
     # canvas.delete("all")
     # canvas.destroy()
-    s = srch.Searcher()
-    best_documents_text,best_documents,time_taken  = s.search(keywords)
-    for i in range(len(best_documents)):
-        best_documents[i] = str(best_documents[i])
+    
+    if(keywords!=''):
+        if(keywords not in cache.keys()):
+            s = srch.Searcher(tdm,word_to_row)
+            best_documents_text,best_documents,time_taken  = s.search(keywords)
+            for i in range(len(best_documents)):
+                best_documents[i] = str(best_documents[i])
+            if(len(prev_queries)):
+                prev_queries.append(keywords)
+                cache[keywords] = [best_documents,best_documents_text]
+                if(len(prev_queries)>memory_length):
+                    prev_queries.pop(0)
+                    del cache[keywords]
+            else:
+                prev_queries.append(keywords)
+                cache[keywords] = [best_documents,best_documents_text]
+        else:
+            best_documents = cache[keywords][0]
+            best_documents_text = cache[keywords][1]
+            time_taken = 0
+    else:
+        best_documents = [0]
+        best_documents_text = [0]
+        time_taken = 0
+
     resultpage(keywords,best_documents_text ,best_documents,'The time taken is ' + str(time_taken))
 
+
+
+
+
 def voicebtn_clicked():
-    print("voice")
+    global voice_query,isVoice
+    r = sr.Recognizer()
+    while(1):   
+        # Exception handling to handle
+        # exceptions at the runtime
+        try:
+            # use the microphone as source for input.
+            with sr.Microphone() as source2:
+                
+                # wait for a second to let the recognizer
+                # adjust the energy threshold based on
+                # the surrounding noise level
+                r.adjust_for_ambient_noise(source2, duration=0.2)
+                
+                #listens for the user's input
+                audio2 = r.listen(source2)
+                
+                # Using google to recognize audio
+                MyText = r.recognize_google(audio2)
+                MyText = MyText.lower()
+    
+                response = input("Did you say '"+ MyText + "'?(y/n)")
+                if(response.lower()=="y"):
+                    voice_query = MyText
+                    isVoice = True
+                    searchbtn_clicked()
+                    break
+
+        except Exception as e:
+            print("failed")
 
 def clear():
     global canvas
@@ -139,8 +216,10 @@ def resultpage(key, best_documents_text,results, str_time):
         #print(results[i])
         int_sum += int(results[i])
     if(int_sum==0):
-        global predicted_word
-        predicted_word ="hello"
+        global predicted_word, fasttext_model
+
+        predicted_word = fasttext_model.wv.most_similar(key)[0][0]
+
         str_result = 'Did you mean "' + predicted_word + '"?'
         #canvas.itemconfig(resultsBox, text=str_result)
         resultsBox = Message(canvas,text=str_result,width=938,bg="#FFFFFF",anchor='w' ,justify=tk.RIGHT,font=('times',20))
@@ -189,13 +268,37 @@ def resultpage(key, best_documents_text,results, str_time):
 
     button1.place(
         x=1270, y=53,
-        width=86,
+        width=120,
         height=47)
+    
+    voicebutton = Button(
+        text="Voice Search",
+        font=25,
+        borderwidth=0,
+        highlightthickness=0,
+        command=voicebtn_clicked,
+        relief="flat")
+    voicebutton.place(
+        x=1270, y=113,
+        width=120,
+        height=47)
+    
     window.mainloop()
 
 
 def init():
     global window
+    global tdm,word_to_row 
+    global fasttext_model
+    fasttext_model = gensim.models.Word2Vec.load("Fasttext.model")
+
+    tdm = np.load("term_document_matrix.npy")
+    path = "./word_to_row.json"
+    decoder = msgspec.json.Decoder()
+    with open(path, "r") as outfile:
+        x = outfile.read()
+
+    word_to_row = decoder.decode(x)
 
     window = Tk()
 
