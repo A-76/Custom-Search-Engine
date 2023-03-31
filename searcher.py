@@ -1,5 +1,6 @@
 import msgspec
 import numpy as np
+from numpy import linalg as LA
 import os
 import json
 import sys
@@ -8,7 +9,7 @@ from nltk.tokenize import word_tokenize
 from krovetzstemmer import Stemmer
 
 class Searcher():
-    def __init__(self):
+    def __init__(self,tdm=None,word_to_row=None):
         self.decoder = msgspec.json.Decoder()
         #Below are all different variations of representing the query to optimize file access
         self.query = []
@@ -18,13 +19,17 @@ class Searcher():
 
         #boolean var to see if all the terms are present or not
         self.final_valid_query = []
-        with open("./id_to_document1.json", "r") as outfile:  #change it to id_to_document
+        with open("./id_to_document2.json", "r") as outfile:  #change it to id_to_document
             x = outfile.read()
 
         self.id_to_document = self.decoder.decode(x)
         #
-        self.K = 15 #returns the top 10 results
-        self.boost_val = 5
+        self.K = 10 #returns the top 10 results
+        self.boost_val = 1
+
+        #The below are values for computing cosine similarity
+        self.tdm = tdm 
+        self.word_to_row = word_to_row
         return
     
     def get_postings_for_query(self):
@@ -49,9 +54,15 @@ class Searcher():
         character_to_query = {}
         for term in query:
             if(term[0] in character_to_query.keys()):
-                character_to_query[term[0]].append(term)
-            else:
-                character_to_query[term[0]] = [term] 
+                if(term[0].isalpha()):
+                    character_to_query[term[0]].append(term)
+                else:
+                    character_to_query["extra"].append(term)
+            else:  
+                if(term[0].isalpha()):
+                    character_to_query[term[0]] = [term] 
+                else:
+                    character_to_query["extra"] = [term] 
              
         return character_to_query
 
@@ -60,21 +71,23 @@ class Searcher():
         query = self.query
         basepath = "./IndexStructure/"
         character_to_query =  self.__character_to_query__(query)
-
+        #print(character_to_query)
         for character in character_to_query:
             if(character.isalpha()):  #If the word is not an alphabet then directory is "extra"
                 word_to_file_location = basepath + character + "/word_to_file.json"
+                
             else:
                 word_to_file_location = basepath + "extra" + "/word_to_file.json"
+            
 
             with open(word_to_file_location, "r") as outfile:
                         x = outfile.read()
             word_to_file = self.decoder.decode(x)
-            self.file_to_terms[character] = {}
+            self.file_to_terms[character] = {}    
 
             for term in character_to_query[character]:
                     if(term in word_to_file.keys()):
-                        #print("Word is present in the dictionary")
+                        #print("Word is present in the dictionary " + term)
                         file_number = word_to_file[term]
                         self.term_to_file[term] = file_number
 
@@ -283,17 +296,36 @@ class Searcher():
     
     
     def positional_search_for_query(self,lower_term_idx,upper_term_idx,best_documents,corresponding_tf_idf):
-        '''
-        1) all words present in the query must exist 
-        2) if any word does not exist then just return the documents the documents common to the words ignoring position
-        '''
+
 
         positional_difference = self.final_valid_query[upper_term_idx][1] - self.final_valid_query[lower_term_idx][1]
         best_documents,corresponding_tf_idf = self.__positional_linear_merge__(lower_term_idx,upper_term_idx,positional_difference,best_documents,corresponding_tf_idf)
         return best_documents,corresponding_tf_idf
     
         
+    def rank_by_cosine_similarity(self,best_documents):
+        #first need to generate the query vector
+        #basically generate a new document with 1's at the location of the word
+        best_documents1 = [0 for i in range(self.K)]
+        corresponding_cosine_sim = [-1 for i in range(self.K)]
+        
+        query_vector = np.zeros((self.tdm.shape[0],))
+        for term in self.final_valid_query:
+            query_vector[self.word_to_row[term[0]]] += 1
+        query_vector_norm = LA.norm(query_vector)
+        
+        for docID in best_documents:
+            if(docID>=self.tdm.shape[1]):
+                docID1 =self.tdm.shape[1]-1
+            document_vector = self.tdm[:,docID1]
+            cos_sim = np.dot(query_vector, document_vector)/(query_vector_norm*LA.norm(document_vector))
+            document = [docID,[0],cos_sim]
+            best_documents1,corresponding_cosine_sim = self.__high_score__(best_documents1,corresponding_cosine_sim,document)
+        
+        #print(f"The cosine similarity is {cos_sim}")
+        return best_documents1
     
+
     def display_top_results(self): 
         best_documents1 = []
         if(len(self.final_valid_query)==1):
@@ -318,7 +350,7 @@ class Searcher():
             j = 1
             best_documents = [0 for i in range(self.K)]
             corresponding_tf_idf = [0 for i in range(self.K)]
-            print(self.final_valid_query)
+            #print(self.final_valid_query)
             while(j<len(self.final_valid_query)):
                 best_documents,corresponding_tf_idf = self.positional_search_for_query(i,j,best_documents,corresponding_tf_idf)
                 i+=1
@@ -326,6 +358,13 @@ class Searcher():
 
             #best_documents1 = self.__linear_merge__()
             
+        #place a try catch here to prevent BT
+        #try:
+        #    best_documents1 = self.rank_by_cosine_similarity(best_documents)
+        #    best_documents = best_documents1
+        #except Exception as e:
+        #    print("Calculating the cosine similarity failed")
+
         print("The most relevant documents are - ")
         print(best_documents)
         #print(best_documents1)
@@ -336,9 +375,13 @@ class Searcher():
         #print(self.id_to_document.keys())
         for docID in best_documents:
             try:
-                results.append(self.id_to_document[str(docID)])
-            except:
-                print(docID)
+                #print(self.id_to_document[str(docID)][1])
+                results.append(self.id_to_document[str(docID)][1])
+            except Exception as e:
+                #results.append(self.id_to_document[str(0)][1])
+                #print(docID)
+                print(e)
+                #print("hi")
         return results
     
 
