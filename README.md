@@ -1,2 +1,2 @@
 # Indexer
-This repo contains our implementation of an indexer that is used for indexing scraped websites.
+This repo contains our implementation of a custom search engine.
